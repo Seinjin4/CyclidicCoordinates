@@ -12,7 +12,8 @@ class LineMeshData {
         this.material = new THREE.ShaderMaterial({
             uniforms : {
                 points : {value : []},
-                pointCount : {value : 0}
+                pointCount : {value : 0},
+                radius: {value: 0.1}
             },
             vertexShader: lineMeshVertexShader,
             fragmentShader: lineMeshFragmentShader,
@@ -22,18 +23,15 @@ class LineMeshData {
     }
 }
 
-let lineMeshData: LineMeshData = new LineMeshData(50, 50)
+let lineMeshData: LineMeshData = new LineMeshData(30, 12)
 
 
 export function CalculateLineMesh(points: Array<THREE.Vector3>): THREE.Mesh {
     lineMeshData.material.uniforms.pointCount.value = points.length
 
-    console.log(lineMeshData.geometry.getIndex());
-
-    if(points.length < lineMeshPointArraySize) {
-        let arrayFilling: Array<THREE.Vector3> = new Array<THREE.Vector3>(lineMeshPointArraySize - points.length, )
-        arrayFilling.fill(new THREE.Vector3(), 0, -1)
-        points = points.concat(arrayFilling)
+    for(let i = points.length; i < lineMeshPointArraySize; i++)
+    {
+        points.push(new THREE.Vector3(0,0,0))
     }
 
     lineMeshData.material.uniforms.points.value = points
