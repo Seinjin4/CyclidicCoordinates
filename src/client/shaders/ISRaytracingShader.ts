@@ -8,6 +8,8 @@ export const ISRaytracingVertexShader: string = `
     out float i_fov;
     out mat4 i_projectionMatrix;
 
+    const float PI = 3.14159265359f;
+
     void main()
     {   
         i_projectionMatrix = projectionMatrix;
@@ -19,13 +21,72 @@ export const ISRaytracingVertexShader: string = `
         i_near = projectionMatrix[3].z / (projectionMatrix[2].z - 1.0);
         i_far = projectionMatrix[3].z / (projectionMatrix[2].z + 1.0);
 
-        i_fov = 2.0f * atan( 1.0f / projectionMatrix[1].y ) * 180.0f;
+        i_fov = 2.0f * atan( 1.0f / projectionMatrix[1].y ) * 180.0f / PI;
+        // i_fov = 2.0f * atan( 1.0f / projectionMatrix[0].x ) * 180.0f / PI;
 
         gl_Position = vec4(position,1.0);
     }
 `
 
-export const ISRaytracingFragmentShader: string = `
+export type coeffs = {
+    t0: string,
+    t1: string,
+    t2: string,
+    t3: string,
+    t4: string,
+}
+
+export type gradient = {
+    x: string,
+    y: string,
+    z: string
+}
+
+
+//coeff[0]t^4 + coeff[0]t^3 + coeff[0]t^2 + coeff[0]t + coeff[0] = 0
+
+// float coeff[5] = float[5](
+//     0.0f,
+//     0.0f,
+//     dot(ray.dir, ray.dir),
+//     2.0f * dot(ray.origin, ray.dir),
+//     dot(ray.origin, ray.origin) - 0.5f*0.5f
+// );
+
+// float coeff[5] = float[5](
+//     0.0f,
+//     0.0f,
+//     d.x * d.x + d.y * d.y + d.z * d.z,
+//     2.0f * (d.x * o.x + d.y * o.y + d.z * o.z),
+//     o.x * o.x + o.y * o.y + o.z * o.z - 1.0f*1.0f
+// );
+
+// float coeff[5] = float[5](
+//     0.0f,
+//     (d.z * d.z * d.z),
+//     (d.x * d.x) + (d.y * d.y) + (3.0f * o.z * d.z * d.z) - (d.z * d.z),
+//     2.0f * ((d.x * o.x) + (d.y * o.y) - (d.z * o.z)) + (3.0f * o.z * o.z * d.z),
+//     (o.x * o.x) + (o.y * o.y) - (o.z * o.z) + (o.z * o.z * o.z)
+// );
+
+// float coeff[5] = float[5](
+//     dd * dd,
+//     4.0f * d3o,
+//     2.0f * (3.0f * dd * oo - dd * RR - rr * dd - 2.0f * RR * (d.x * d.x + d.y * d.y)),
+//     4.0f * (do3 + od * RR - od * rr - 2.0f * RR * (d.x * o.x + d.y * o.y)),
+//     oo * oo + 2.0f * (oo * RR - oo * rr - 2.0f * RR * (o.x * o.x + o.y * o.y)) + RR * RR - 4.0f * RR * rr + rr * rr
+// );
+
+// float coeff[5] = float[5](
+//     dd * dd,
+//     4.0f * d3o,
+//     2.0f * dd * (oo - (rr +RR)) + 4.0f * (od * od) + 4.0f * RR * (d.y*d.y),
+//     4.0f * (oo - (rr + RR)) * od + 8.0f*RR*(o.y*d.y),
+//     (oo - (rr + RR)) * (oo - (rr + RR)) - 4.0f*RR*(rr - o.y*o.y)
+// );
+
+export function ConstructRTFragmentShader(c: coeffs, g: gradient): string {
+    return `
     uniform vec2 resolution;
     in vec3 i_forward;
     in vec3 i_up;
@@ -36,45 +97,19 @@ export const ISRaytracingFragmentShader: string = `
     in mat4 i_projectionMatrix;
 
     const float PI = 3.14159265359f;
-    const float tMin = 0.5f;
+    const float tMin = 0.2f;
+
+    vec3 objectColor;
 
     float sgn(float x) {
-        return x < 0.0 ? -1.0: 1.0; // Return 1 for x == 0
+        return x < 0.0 ? -1.0: 1.0;
       }
 
     void assert(bool t) {
     }
 
-    struct Ray {
-        vec3 origin;
-        vec3 dir;
-    };
-
-    struct Camera {
-        vec3 origin;
-        vec3 dir;
-        vec3 up;
-        vec3 right;
-        float fov;
-    };
-
-    vec3 rayAt(Ray r, float t) {
-        return r.origin + t * r.dir;
-    }
-
-    bool hit_sphere(vec3 center, float radius, Ray r, out float t) {
-        vec3 oc = r.origin - center;
-        float a = dot(r.dir, r.dir);
-        float b = 2.0f * dot(oc, r.dir);
-        float c = dot(oc, oc) - radius*radius;
-        float discriminant = b*b - 4.0f * a * c;
-        if (discriminant < 0.0f) {
-            t = -1.0f;
-            return false;
-        } else {
-            t = (-b - sqrt(discriminant) ) / (2.0f*a);
-            return true;
-        }
+    vec3 rayAt(vec3 o, vec3 d, float t) {
+        return o + t * d;
     }
 
     float evalquadratic(float x, float A, float B, float C) {
@@ -224,91 +259,80 @@ export const ISRaytracingFragmentShader: string = `
 
     vec4 sortVec4(vec4 roots)
     {
-        if(roots.y < roots.x) roots.xy = roots.yx;
+        if(roots.y > roots.x) roots.xy = roots.yx;
         if(roots.w < roots.z) roots.zw = roots.wz;
         return vec4(min(roots.x, roots.z), max(roots.x, roots.z),min(roots.y, roots.w), max(roots.y, roots.w));
     }
 
-    float calculateDepth(Camera camera, Ray ray, float t)
+    // vec4 sortVec4(vec4 roots)
+    // {
+    //     vec2 a = vec2(min(roots.x, roots.y), max(roots.x, roots.y));
+    //     vec2 b = vec2(min(roots.z, roots.w), max(roots.z, roots.w));
+    //     return vec4(vec2(a.x, b.x), vec2(a.y, b.y));
+    // }
+
+    float calculateDepth(vec3 o, vec3 d, float t)
     {
-        float eyeHitZ = -t *dot(camera.dir ,ray.dir);
+        float eyeHitZ = -t *dot(i_forward, d);
         float ndcDepth = ((i_far + i_near) + (2.0*i_far*i_near)/eyeHitZ) / (i_far-i_near);
         return ((gl_DepthRange.diff * ndcDepth) + gl_DepthRange.near + gl_DepthRange.far) / 2.0;
     }
 
+    vec4 calculateColor(vec3 o, vec3 d, float t, vec3 n)
+    {
+        vec3 lightColor = vec3(0.6, 0.6, 0.6);
+        vec3 outsideColor = vec3(0.3, 0.3, 0.8);
+        vec3 insideColor = vec3(0.3, 0.8, 0.3);
+        float ambientStrength = 0.5;
+        vec3 ambient = ambientStrength * lightColor;
+        vec3 lightDir = normalize(-vec3(0.5, 0.7, 0.5));  
+        float diff = max(dot(n, lightDir), 0.0);
+        float dirdiff = dot(n, d);
+        if(dirdiff < 0.0)
+        {
+            objectColor = outsideColor;
+        }
+        else
+            objectColor = insideColor;
+            
+        vec3 diffuse = diff * lightColor;
+        vec3 result = (ambient + diffuse) * objectColor;
+        return vec4(result, 1.0);
+    }
+
     void main()
     {
-        Camera camera = Camera(
-            cameraPosition, //position
-            i_forward, //forward / dir
-            i_up, //up
-            i_right, //right
-            i_fov / PI // fov
-            );
-
         float aspectRatio = resolution.x / resolution.y;
+        vec2 standartRezolution = vec2(3440, 1440);
+        // vec2 standartRezolution = resolution;
+        vec2 resDiff = resolution / standartRezolution;
 
-        vec3 hor = -tan(camera.fov * 2.0f) * camera.right;
-        vec3 ver = length(hor) / aspectRatio * camera.up;
+        vec3 hor = -tan(i_fov * 2.0f) * i_right * resDiff.x;
+        vec3 ver = length(hor) / aspectRatio * i_up * resDiff.y;
 
         vec2 uv = (gl_FragCoord.xy / resolution - vec2(0.5,0.5)) * 2.0f;
-
-        Ray ray = Ray(
-            camera.origin,
-            normalize(camera.dir + uv.x * hor + uv.y * ver)
-            );
         
-        vec3 o = ray.origin;
-        vec3 d = ray.dir;
-
-        //coeff[0]t^4 + coeff[0]t^3 + coeff[0]t^2 + coeff[0]t + coeff[0] = 0
-
-        // float coeff[5] = float[5](
-        //     0.0f,
-        //     0.0f,
-        //     dot(ray.dir, ray.dir),
-        //     2.0f * dot(ray.origin, ray.dir),
-        //     dot(ray.origin, ray.origin) - 0.5f*0.5f
-        // );
-
-        // float coeff[5] = float[5](
-        //     0.0f,
-        //     0.0f,
-        //     d.x * d.x + d.y * d.y + d.z * d.z,
-        //     2.0f * (d.x * o.x + d.y * o.y + d.z * o.z),
-        //     o.x * o.x + o.y * o.y + o.z * o.z - 1.0f*1.0f
-        // );
-
-        // float coeff[5] = float[5](
-        //     0.0f,
-        //     (d.z * d.z * d.z),
-        //     (d.x * d.x) + (d.y * d.y) + (3.0f * o.z * d.z * d.z) - (d.z * d.z),
-        //     2.0f * ((d.x * o.x) + (d.y * o.y) - (d.z * o.z)) + (3.0f * o.z * o.z * d.z),
-        //     (o.x * o.x) + (o.y * o.y) - (o.z * o.z) + (o.z * o.z * o.z)
-        // );
+        vec3 o = cameraPosition;
+        vec3 d = normalize(i_forward + uv.x * hor + uv.y * ver);
 
         float dd = dot(d, d);
         float oo = dot(o, o);
         float od = dot(d, o);
         float d3o = dot(d, d) * dot(d, o);
+        float dddo = dot(d, d) * dot(d, o);
         float do3 = dot(d, o) * dot(o, o);
-        float RR = 0.7f * 0.7f;
-        float rr = 0.4f * 0.4f;
-
-        // float coeff[5] = float[5](
-        //     dd * dd,
-        //     4.0f * d3o,
-        //     2.0f * (3.0f * dd * oo - dd * RR - rr * dd - 2.0f * RR * (d.x * d.x + d.y * d.y)),
-        //     4.0f * (do3 + od * RR - od * rr - 2.0f * RR * (d.x * o.x + d.y * o.y)),
-        //     oo * oo + 2.0f * (oo * RR - oo * rr - 2.0f * RR * (o.x * o.x + o.y * o.y)) + RR * RR - 4.0f * RR * rr + rr * rr
-        // );
+        float dooo = dot(d, o) * dot(o, o);
+        float R = 0.5f;
+        float RR = R*R;
+        float r = 0.1f;
+        float rr = r * r;
         
         float coeff[5] = float[5](
-            dd * dd,
-            4.0f * d3o,
-            2.0f * dd * (oo - (rr +RR)) + 4.0f * (od * od) + 4.0f * RR * (d.y*d.y),
-            4.0f * (oo - (rr + RR)) * od + 8.0f*RR*(o.y*d.y),
-            (oo - (rr + RR)) * (oo - (rr + RR)) - 4.0f*RR*(rr - o.y*o.y)
+            ${c.t4},
+            ${c.t3},
+            ${c.t2},
+            ${c.t1},
+            ${c.t0}
         );
 
         bool drawn = false;
@@ -319,36 +343,55 @@ export const ISRaytracingFragmentShader: string = `
         if (n != 0) 
         {
             vec4 sr = sortVec4(res);
-            for(int i = 0; i < n; i++)
+            //vec4 sr = res;
+            for(int i = 0; i < 4; i++)
             {
-                if(sr[i] > tMin && sr[i] < i_far && sr[i] > 0.0)
-                {
-                    #if 1
-                    if(length(rayAt(ray, sr[i])) > 5.0f)
-                        continue;
-                    #endif
-                    
-                    vec3 coord = o + d * sr[i];
-                    float x = coord.x;
-                    float y = coord.y;
-                    float z = coord.z;
+                float t = sr[i];
+                vec3 coord = rayAt(o, d, t);
 
-                    vec3 normal = vec3(
-                        x * (4.0 * (x*x + y*y + z*z) - 4.0 * (RR + rr)),
-                        y * (4.0* (x*x + y*y + z*z) + 8.0 * RR - 4.0 * (RR + rr)),
-                        z * (4.0 * (x*x + y*y + z*z) - 4.0 * (RR + rr))
-                    );
+                if(t < 0.0f)
+                    continue; 
 
-                    drawn = true;
-                    vec3 color = normalize(vec3(normal.x + 1.0, normal.y + 1.0, normal.z + 1.0)) / 2.0;
-                    gl_FragColor = vec4(color, 1.0);   
-                    gl_FragDepth = calculateDepth(camera, ray, sr[i]); 
-                    break;
-                }
+                #if 1
+                if(t < tMin || t > i_far)
+                    continue;   
+                #endif
+
+                #if 1
+                if(length(coord) > 5.0f)
+                    continue;
+                #endif
+
+                #if 1
+                if(coord.x > 0.0f)
+                    continue;
+                #endif
+
+                drawn = true;
+                
+                float x = coord.x;
+                float y = coord.y;
+                float z = coord.z;
+
+                vec3 normal = -vec3(
+                    ${g.x},
+                    ${g.y},
+                    ${g.z}
+                );
+
+                gl_FragColor = calculateColor(o, d, sr[i], normal);   
+                gl_FragDepth = calculateDepth(o, d, sr[i]); 
+                break;
             }
         }
         if(!drawn)
+        {
+        #if 1
             discard;
+        #endif
+        }
 
     } 
 `
+}
+
