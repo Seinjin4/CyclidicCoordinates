@@ -1,71 +1,62 @@
 import * as THREE from "three";
-import { ISRaytracingFragmentShader, ISRaytracingVertexShader } from "../shaders/ISRaytracingShader";
+import {ConstructRTFragmentShader, ISRaytracingVertexShader, ImplicitSurfaceShaderGenerator, coeffs, gradient } from "../shaders/ISRaytracingShader";
+import { GenerateMaterialUniforms, Uniform } from "../shaders/ShaderGenerator";
 
-class ImplicitSurfaceMesh {
+export class ImplicitSurfaceMesh {
     geometry: THREE.PlaneGeometry;
     material: THREE.ShaderMaterial;
 
-    constructor() {
+    constructor(c: coeffs, g: gradient, uniforms: Uniform[]) {
         this.geometry = new THREE.PlaneGeometry(2, 2, 1, 1)
 
+        let shaderGenerator = new ImplicitSurfaceShaderGenerator(c, g, uniforms)
+
+        const shader = shaderGenerator.GenerateShaders()
+
+        const materialUniforms = GenerateMaterialUniforms(uniforms)
+
+        materialUniforms["resolution"] = {value : new THREE.Vector2(window.innerWidth, window.innerHeight)}
+        materialUniforms["forward"] = {value : new THREE.Vector3()}
+        materialUniforms["up"] = {value : new THREE.Vector3()}
+        materialUniforms["right"] = {value : new THREE.Vector3()}
+
         this.material = new THREE.ShaderMaterial({
-            uniforms : {
-                resolution: {value: new THREE.Vector2(window.innerWidth, window.innerHeight)},
-                forward: {value : new THREE.Vector3()},
-                up: {value : new THREE.Vector3()},
-                right: {value : new THREE.Vector3()}
-            },
-            vertexShader: ISRaytracingVertexShader,
-            fragmentShader: ISRaytracingFragmentShader,
+            uniforms : materialUniforms,
+            vertexShader: shader.vertex,
+            fragmentShader: shader.fragment,
             wireframe: false
         })
     }
-}
 
-let implicitSurfaceData = new ImplicitSurfaceMesh();
+    public CreateMesh(): THREE.Mesh {
+        return new THREE.Mesh(this.geometry, this.material)
+    }
 
-export function UpdateISMeshResolutionUniform(): void {
-    implicitSurfaceData.material.uniforms.resolution.value = new THREE.Vector2(window.innerWidth, window.innerHeight)   
-}
+    public setUniform(uniform: string, value: any): void {
+        this.material.uniforms[uniform] = {value: value}
+    }
 
-export function UpdateIsMeshCamera(camera: THREE.PerspectiveCamera)
-{
-    let forward = camera.getWorldDirection(new THREE.Vector3())
-    let m = camera.matrixWorldInverse.toArray()
-    //let up = new THREE.Vector3(m[4], m[5], m[6])
-    let up = camera.up
-    let right = camera.getWorldDirection(new THREE.Vector3());
-    right.cross(up).normalize()
-    up = new THREE.Vector3().copy(right).cross(forward).normalize()
-    // console.log("---")
-    // console.log({
-    //     forward: forward,
-    //     up: up,
-    //     right: right
-    // })
-    camera.getWorldPosition
-    implicitSurfaceData.material.uniforms.forward.value = forward;  
-    implicitSurfaceData.material.uniforms.up.value = up;  
-    implicitSurfaceData.material.uniforms.right.value = right;  
-}
+    public UpdateResolution(): void {
+        this.material.uniforms.resolution.value = new THREE.Vector2(window.innerWidth, window.innerHeight)   
+    }
 
-export function CalculateISMesh(): THREE.Mesh {
-    return new THREE.Mesh(implicitSurfaceData.geometry, implicitSurfaceData.material);
-}
-
-export function hit_sphere(
-    center: THREE.Vector3,
-    radius: number,
-    rayOrigin: THREE.Vector3,
-    rayDir: THREE.Vector3): boolean 
-    {
-    let oc = rayOrigin.sub(center);
-    let a = rayDir.dot(rayDir);
-    let b = 2.0 * oc.dot(rayDir);
-    let c = oc.dot(oc) - radius*radius;
-    let discriminant = b*b - 4.0 * a * c;
-
-    if (discriminant < 0.0)
-        return false;
-    return true;
+    // public UpdateCamera(camera: THREE.PerspectiveCamera): void {
+    //     let forward = camera.getWorldDirection(new THREE.Vector3())
+    //     let m = camera.matrixWorldInverse.toArray()
+    //     //let up = new THREE.Vector3(m[4], m[5], m[6])
+    //     let up = camera.up
+    //     let right = camera.getWorldDirection(new THREE.Vector3());
+    //     right.cross(up).normalize()
+    //     up = new THREE.Vector3().copy(right).cross(forward).normalize()
+    //     // console.log("---")
+    //     // console.log({
+    //     //     forward: forward,
+    //     //     up: up,
+    //     //     right: right
+    //     // })
+    //     camera.getWorldPosition
+    //     this.material.uniforms.forward.value = forward;  
+    //     this.material.uniforms.up.value = up;  
+    //     this.material.uniforms.right.value = right;  
+    // }
 }

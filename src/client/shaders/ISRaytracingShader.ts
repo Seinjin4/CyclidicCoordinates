@@ -2,29 +2,27 @@ import { GetEqData } from "../math"
 import { PrepareUniforms, ShaderGenerator, Shaders, Uniform } from "./ShaderGenerator"
 
 export const ISRaytracingVertexShader: string = `
+    uniform vec2 resolution;
     out vec3 i_forward;
-    out vec3 i_up;
-    out vec3 i_right;
     out float i_near;
     out float i_far;
-    out float i_fov;
-    out mat4 i_projectionMatrix;
+    out vec3 i_dir;
+    out vec3 i_eye;
 
     const float PI = 3.14159265359f;
 
     void main()
     {   
-        i_projectionMatrix = projectionMatrix;
-
-        i_right = vec3(viewMatrix[0].x, viewMatrix[1].x, viewMatrix[2].x);
-        i_up = vec3(viewMatrix[0].y, viewMatrix[1].y, viewMatrix[2].y);
         i_forward = -vec3(viewMatrix[0].z, viewMatrix[1].z, viewMatrix[2].z);
 
         i_near = projectionMatrix[3].z / (projectionMatrix[2].z - 1.0);
-        i_far = projectionMatrix[3].z / (projectionMatrix[2].z + 1.0);
+        i_far = projectionMatrix[3].z / (projectionMatrix[2].z + 1.0); PI;
 
-        i_fov = 2.0f * atan( 1.0f / projectionMatrix[1].y ) * 180.0f / PI;
-        // i_fov = 2.0f * atan( 1.0f / projectionMatrix[0].x ) * 180.0f / PI;
+        float aspect = (resolution.x / resolution.y);
+        float fov_y_scale =  1.0 / (projectionMatrix[0].x * aspect);
+
+        i_eye = -(modelViewMatrix[3].xyz)*mat3(modelViewMatrix);
+        i_dir = vec3(position.x*fov_y_scale*aspect,position.y*fov_y_scale,-1.0) * mat3(modelViewMatrix);
 
         gl_Position = vec4(position,1.0);
     }
@@ -92,12 +90,10 @@ export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[]):
     uniform vec2 resolution;
     ${PrepareUniforms(u)}
     in vec3 i_forward;
-    in vec3 i_up;
-    in vec3 i_right;
     in float i_near;
     in float i_far;
-    in float i_fov;
-    in mat4 i_projectionMatrix;
+    in vec3 i_dir;
+    in vec3 i_eye;
 
     const float PI = 3.14159265359f;
     const float tMin = 0.2f;
@@ -254,8 +250,6 @@ export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[]):
     vec4 calculateColor(vec3 p, vec3 d, vec3 n)
     {
         vec3 lightColor = vec3(0.6, 0.6, 0.6);
-        vec3 outsideColor = vec3(0.3, 0.3, 0.8);
-        vec3 insideColor = vec3(0.3, 0.8, 0.3);
         //objectColor = outsideColor;
         float ambientStrength = 0.5;
         vec3 ambient = ambientStrength * lightColor;
@@ -265,10 +259,10 @@ export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[]):
         float dirdiff = dot(n, d);
         if(dirdiff < 0.0)
         {
-            objectColor = outsideColor;
+            objectColor = insideColor;
         }
         else
-            objectColor = insideColor;
+            objectColor = outsideColor;
             
         vec3 diffuse = diff * lightColor;
         vec3 result = (ambient + diffuse) * objectColor;
@@ -294,6 +288,7 @@ export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[]):
         {
             nroots = 1;
             roots.x = -e / d;
+            
             roots.yzw = vec3(1e8, 1e8, 1e8);
         }
         if(a == 0.0 && b == 0.0) //quadratic
@@ -309,28 +304,24 @@ export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[]):
         else
         {
             nroots = quartic(a, b, c, d, e, roots);
+            if(nroots == 2)
+                roots.zw = vec2(1e8, 1e8);
+            else if(nroots == 0)
+                roots = vec4(1e8, 1e8, 1e8, 1e8);
         }
         return nroots;
     }
 
     bool isInBounds(vec3 p)
     {
-        return p.y < Ut && p.y > 0.0 && p.x > 0.0;
-        // return true;
+        //return p.y < Ut && p.y > 0.0 && p.x > 0.0 && p.z < 0.0 && length(p.xz) < 2.0;
+        return length(p.xz) < 10.0 && p.y > 0.0 && p.y < 10.0 && p.z > 0.0;
+        // return p.y < Ut && p.y > 0.0;
+        return true;
     }
 
     bool calculate_intersection(vec3 o, vec3 d, float tmin, out Result result)
     {
-        float dd = dot(d, d);
-        float oo = dot(o, o);
-        float od = dot(d, o);
-        float d3o = dot(d, d) * dot(d, o);
-        float dddo = dot(d, d) * dot(d, o);
-        float do3 = dot(d, o) * dot(o, o);
-        float dooo = dot(d, o) * dot(o, o);
-        float RR = R*R;
-        float rr = r * r;
-
         float coeff[5] = float[5](
             ${c.t4},
             ${c.t3},
@@ -343,7 +334,6 @@ export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[]):
         int nroots = solve(coeff[0], coeff[1], coeff[2], coeff[3] ,coeff[4], roots);
 
         // Find smallest root greater than tmin.
-        result.t = 1e8;
         float t = result.t;
         for (int i = 0; i < 4; i++) {
           if (i == nroots) break;
@@ -365,56 +355,26 @@ export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[]):
 
     void scene(vec3 o, vec3 d) {
         vec3 color = vec3(0);
-        float att = 1.0;
         vec3 p = o;
         float t = 0.0;
-        for (int i = 0; i < 1; i++) {
 
-            // if (dot(p,p) > 1000.0) break;
-            
-            float tmin = -dot(p,d);
-            p += tmin*d;
-            Result res = Result(vec3(0), vec3(0), 1e8, vec3(0));
-            if (!calculate_intersection(p, d, -tmin, res)) break;
+        // if (dot(p,p) > 1000.0) break;
+        
+        float tmin = -dot(p,d);
+        //p += tmin*d;
+        Result res = Result(vec3(0), vec3(0), 1e7, vec3(0));
+        if (!calculate_intersection(p, d, -tmin, res)) discard;
 
-            //   color += att*res.color.xyz;
-            color = res.color.xyz;
-            att *= 0.5;
-            p = res.p;
-            t = res.t;
-        }
-        if(color == vec3(0))
-            discard;
-        gl_FragDepth = calculateDepth(o, d, t); 
-        gl_FragColor = vec4(color, 1.0);
+        gl_FragColor = vec4(res.color, 1.0);
+        gl_FragDepth = calculateDepth(p, d, res.t); 
       }
 
     void main()
     {
-        float aspectRatio = resolution.x / resolution.y;
-        vec2 standartRezolution = vec2(3440, 1440);
-        // vec2 standartRezolution = resolution;
-        vec2 resDiff = resolution / standartRezolution;
+        vec3 o = i_eye;
+        vec3 d = normalize(i_dir);
 
-        vec3 hor = -tan(i_fov * 2.0f) * i_right * resDiff.x;
-        vec3 ver = length(hor) / aspectRatio * i_up * resDiff.y;
-
-        vec2 uv = (gl_FragCoord.xy / resolution - vec2(0.5,0.5)) * 2.0f;
-        
-        vec3 o = cameraPosition;
-        vec3 d = normalize(i_forward + uv.x * hor + uv.y * ver);
-
-        
         scene(o, d);
-        // Result res;
-        // if(calculate_intersection(o, d, res))
-        // {
-        //     gl_FragDepth = calculateDepth(o, d, res.t); 
-        //     gl_FragColor = vec4(res.color, 1.0);
-        // }
-        // else
-        //     discard;
-
     } 
 `
 }
@@ -425,19 +385,9 @@ export class ImplicitSurfaceShaderGenerator implements ShaderGenerator {
     c: coeffs
     g: gradient
 
-    constructor(c: coeffs, g: gradient, uniforms: Uniform[], eq?: string) {
-        if(eq !== undefined)
-        {
-            const d = GetEqData(eq)
-            // Parse eq and get coeffs and gradient
-            this.c = d.coeffs
-            this.g = d.gradient
-        }
-        else
-        {
-            this.c = c
-            this.g = g
-        }
+    constructor(c: coeffs, g: gradient, uniforms: Uniform[]) {
+        this.c = c
+        this.g = g
 
         this.calculateColorFunction = '' // for now
         

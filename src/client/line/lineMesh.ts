@@ -1,54 +1,121 @@
 import * as THREE from "three";
 import { Vector3 } from "three";
-import { lineMeshFragmentShader, lineMeshPointArraySize, lineMeshVertexShader } from "../shaders/lineMeshShader";
+import { LineMeshShaderGenerator, lineMeshPointArraySize } from "../shaders/lineMeshShader";
+import { GenerateMaterialUniforms } from "../shaders/ShaderGenerator";
 
-class LineMeshData {
-    geometry: THREE.PlaneGeometry;
-    material: THREE.ShaderMaterial;
+export class TubeMesh {
+    geometry: THREE.PlaneGeometry
+    material: THREE.ShaderMaterial
+    shaderGenerator: LineMeshShaderGenerator
 
-    constructor(wSegments: number, hSegments: number) {
-        this.geometry = new THREE.PlaneGeometry(1, 1, wSegments, hSegments)
+    constructor(wSegments: number, lSegments: number, closed: boolean) {
+        this.geometry = new THREE.PlaneGeometry(1, 1, lSegments - 1, wSegments - 1)
+
+        this.AddAdditionalIndices(wSegments - 1, lSegments - 1, closed)
+
+        this.shaderGenerator = new LineMeshShaderGenerator()
+        const shaders = this.shaderGenerator.GenerateShaders()
+        console.log(shaders)
+
+        const materialUniforms = GenerateMaterialUniforms(this.shaderGenerator.uniforms)
+
+        materialUniforms["points"] = {value : []}
+        materialUniforms["pointCount"] = {value : 0}
+        materialUniforms["wSegments"] = {value : wSegments}
 
         this.material = new THREE.ShaderMaterial({
-            uniforms : {
-                points : {value : []},
-                pointCount : {value : 0},
-                radius: {value: 0.1}
-            },
-            vertexShader: lineMeshVertexShader,
-            fragmentShader: lineMeshFragmentShader,
-            shadowSide: THREE.DoubleSide,
-            wireframe: true
+            uniforms : materialUniforms,
+            vertexShader: shaders.vertex,
+            fragmentShader: shaders.fragment,
+            side: THREE.FrontSide ,
+            wireframe: false
         })
     }
-}
-
-let lineMeshData: LineMeshData = new LineMeshData(30, 12)
-
-
-export function CalculateLineMesh(points: Array<THREE.Vector3>): THREE.Mesh {
-    lineMeshData.material.uniforms.pointCount.value = points.length
-
-    for(let i = points.length; i < lineMeshPointArraySize; i++)
-    {
-        points.push(new THREE.Vector3(0,0,0))
+    
+    public setUniform(uniform: string, value: any): void {
+        this.material.uniforms[uniform] = {value: value}
     }
 
-    lineMeshData.material.uniforms.points.value = points
-    return new THREE.Mesh(lineMeshData.geometry, lineMeshData.material);
-}
+    public RegenerateShader()
+    {
 
-export function createLine(color: THREE.Color, dir: THREE.Vector3): THREE.Line {
-    const material = new THREE.LineBasicMaterial({
-        color: color
-    })
+    }
+
+    public SetPoints(points: Array<THREE.Vector3>): void {
+        this.material.uniforms.pointCount.value = points.length
+
+        for(let i = points.length; i < lineMeshPointArraySize; i++)
+        {
+            points.push(new THREE.Vector3(0,0,0))
+        }
     
-    const points = [];
-    points.push( new THREE.Vector3( 0, 0, 0 ) );
-    points.push( dir);
-    
-    const geometry = new THREE.BufferGeometry().setFromPoints( points );
-    
-    const line = new THREE.Line( geometry, material );
-    return line
+        this.material.uniforms.points.value = points
+    }
+
+    public CreateMesh(): THREE.Mesh {
+        return new THREE.Mesh(this.geometry, this.material)
+    }
+
+    private AddAdditionalIndices(wSegments: number, lSegments: number, closed: boolean): void {
+        const indexArrayLike = this.geometry.getIndex()?.array
+
+        if(indexArrayLike === undefined)
+            return
+        
+        let indexArray = Array.from(indexArrayLike)
+        const lastRowStart = (lSegments + 1) * wSegments
+
+        // connect seam along the tube
+        for(let i = 0; i < lSegments; i++)
+        {
+
+            let a = lastRowStart + i                                // a - c
+            let b = i                                               // | /
+            let c = lastRowStart + i + 1                            // b 
+
+            indexArray.push(a);
+            indexArray.push(b);
+            indexArray.push(c);
+
+            a = i                                                  //     c
+            b = i + 1                                              //   / |
+            c = lastRowStart + i + 1                               // a - b
+
+            indexArray.push(a);
+            indexArray.push(b);
+            indexArray.push(c);
+        }
+
+        if(closed)
+        {
+            for(let i = 0; i < wSegments + 1; i++)
+            {
+            let a = (lSegments + 1) * (i + 1) - 1                  // a - c
+            let b = (lSegments + 1) * (i + 2) - 1                  // | /
+            let c = (lSegments + 1) * i                            // b                 
+
+            indexArray.push(a);
+            indexArray.push(b);
+            indexArray.push(c);
+
+            a = (lSegments + 1) * (i + 2) - 1                     //     c
+            b = (lSegments + 1) * (i + 1)                         //   / |
+            c = (lSegments + 1) * i                               // a - b
+
+            indexArray.push(a);
+            indexArray.push(b);
+            indexArray.push(c);
+            }
+            
+            indexArray.push((lSegments + 1) * (wSegments + 1) - 1);
+            indexArray.push(lSegments);
+            indexArray.push((lSegments + 1) * wSegments);
+
+            indexArray.push(lSegments);
+            indexArray.push(0);
+            indexArray.push((lSegments + 1) * wSegments);
+        }
+
+        this.geometry.setIndex(indexArray)
+    }
 }
