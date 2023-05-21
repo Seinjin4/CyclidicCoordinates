@@ -5,7 +5,8 @@ import * as DTS from "./DragControlTest"
 import * as TS from "./TestScene"
 
 const renderer = new THREE.WebGLRenderer()
-
+console.log('Max funiforms: ' + renderer.capabilities.maxFragmentUniforms)
+console.log('Max vuniforms: ' + renderer.capabilities.maxVertexUniforms)
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
 

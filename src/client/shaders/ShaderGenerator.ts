@@ -35,7 +35,7 @@ type MaterialUniform = {
 }
 
 interface ShaderGenerator {
-    calculateColorFunction: string
+    calculateColorFunction: string | undefined
     uniforms: Uniform[]
 
     GenerateShaders(): Shaders

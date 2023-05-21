@@ -6,10 +6,10 @@ export class ImplicitSurfaceMesh {
     geometry: THREE.PlaneGeometry;
     material: THREE.ShaderMaterial;
 
-    constructor(c: coeffs, g: gradient, uniforms: Uniform[]) {
+    constructor(c: coeffs, g: gradient, uniforms: Uniform[], isInBoundsFunction?: string, calculateColorFunction?:string) {
         this.geometry = new THREE.PlaneGeometry(2, 2, 1, 1)
 
-        let shaderGenerator = new ImplicitSurfaceShaderGenerator(c, g, uniforms)
+        let shaderGenerator = new ImplicitSurfaceShaderGenerator(c, g, uniforms, calculateColorFunction, isInBoundsFunction)
 
         const shader = shaderGenerator.GenerateShaders()
 

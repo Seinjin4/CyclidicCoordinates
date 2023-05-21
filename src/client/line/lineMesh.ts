@@ -15,7 +15,6 @@ export class TubeMesh {
 
         this.shaderGenerator = new LineMeshShaderGenerator()
         const shaders = this.shaderGenerator.GenerateShaders()
-        console.log(shaders)
 
         const materialUniforms = GenerateMaterialUniforms(this.shaderGenerator.uniforms)
 

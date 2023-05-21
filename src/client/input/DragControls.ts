@@ -1,9 +1,12 @@
 import {
     Camera,
+	Color,
 	EventDispatcher,
 	Line3,
+	Material,
 	Mesh,
 	MeshBasicMaterial,
+	MeshLambertMaterial,
 	Plane,
 	Raycaster,
 	SphereGeometry,
@@ -30,11 +33,11 @@ class DragObject extends EventDispatcher {
     onDragEnd: () => void
     onDrag: () => void
 
-    constructor(draggingArea: Plane, sceneObject?: Mesh) {
+    constructor(draggingArea: Plane, position?: THREE.Vector3, sceneObject?: Mesh) {
         super()
         this.positionValidation = this.DefaultPositionValidation
-        this.onHoverOn = this.EmptyAction
-        this.onHoverOff = this.EmptyAction
+        this.onHoverOn = this.DefaultHoverOn
+        this.onHoverOff = this.DefaultHoverOff
         this.onDragStart = this.EmptyAction
         this.onDragEnd = this.EmptyAction
         this.onDrag = this.EmptyAction
@@ -44,19 +47,36 @@ class DragObject extends EventDispatcher {
         else
             this.sceneObject = sceneObject
 
+        if(position !== undefined) 
+            this.sceneObject.position.copy(position)
+
         this.draggingArea = draggingArea
     }
 
     CreateDefaultMesh(): THREE.Mesh {
-        const geometry = new SphereGeometry(0.05, 10, 10);
-        const material = new MeshBasicMaterial({
-            color: 0xff0000 
+        const geometry = new SphereGeometry(0.08, 10, 10);
+        const material = new MeshLambertMaterial({
+            color: new Color(0.5, 0.07, 1)
         })
 
         return new Mesh(geometry, material)
     }
 
     EmptyAction(): void {}
+
+    DefaultHoverOn(): void {
+        if(this.sceneObject.material instanceof MeshLambertMaterial)
+        {
+            this.sceneObject.material.color.setRGB(0.67, 0.14, 0.99)
+        }
+    }
+
+    DefaultHoverOff(): void {
+        if(this.sceneObject.material instanceof MeshLambertMaterial)
+        {
+            this.sceneObject.material.color.setRGB(0.5, 0.07, 1)
+        }
+    }
 
     DefaultPositionValidation(pos: THREE.Vector3): THREE.Vector3 {
         return pos
