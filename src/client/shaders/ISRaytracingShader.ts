@@ -85,7 +85,7 @@ export type gradient = {
 //     (oo - (rr + RR)) * (oo - (rr + RR)) - 4.0f*RR*(rr - o.y*o.y)
 // );
 
-export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[]): string {
+export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[], isInBounds: string, calculateColor: string): string {
     return `
     uniform vec2 resolution;
     ${PrepareUniforms(u)}
@@ -247,27 +247,7 @@ export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[]):
         return ((gl_DepthRange.diff * ndcDepth) + gl_DepthRange.near + gl_DepthRange.far) / 2.0;
     }
 
-    vec4 calculateColor(vec3 p, vec3 d, vec3 n)
-    {
-        vec3 lightColor = vec3(0.6, 0.6, 0.6);
-        //objectColor = outsideColor;
-        float ambientStrength = 0.5;
-        vec3 ambient = ambientStrength * lightColor;
-        vec3 lightDir = normalize(-vec3(0.5, 0.7, 0.5));  
-        float diff = dot(n, lightDir);
-        if(diff < 0.0) diff = -diff;
-        float dirdiff = dot(n, d);
-        if(dirdiff < 0.0)
-        {
-            objectColor = insideColor;
-        }
-        else
-            objectColor = outsideColor;
-            
-        vec3 diffuse = diff * lightColor;
-        vec3 result = (ambient + diffuse) * objectColor;
-        return vec4(result, 1.0);
-    }
+    ${calculateColor}
 
     vec3 calculate_normal(vec3 p)
     {
@@ -312,13 +292,7 @@ export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[]):
         return nroots;
     }
 
-    bool isInBounds(vec3 p)
-    {
-        //return p.y < Ut && p.y > 0.0 && p.x > 0.0 && p.z < 0.0 && length(p.xz) < 2.0;
-        return length(p.xz) < 10.0 && p.y > 0.0 && p.y < 10.0 && p.z > 0.0;
-        // return p.y < Ut && p.y > 0.0;
-        return true;
-    }
+    ${isInBounds}
 
     bool calculate_intersection(vec3 o, vec3 d, float tmin, out Result result)
     {
@@ -380,23 +354,56 @@ export function ConstructRTFragmentShader(c: coeffs, g: gradient, u: Uniform[]):
 }
 
 export class ImplicitSurfaceShaderGenerator implements ShaderGenerator {
-    calculateColorFunction: string
+    calculateColorFunction: string | undefined
+    isInBoundsFunction: string | undefined
     uniforms: Uniform[]
     c: coeffs
     g: gradient
 
-    constructor(c: coeffs, g: gradient, uniforms: Uniform[]) {
+    constructor(c: coeffs, g: gradient, uniforms: Uniform[], calculateColorFunction?: string, isInBoundsFunction?: string) {
         this.c = c
         this.g = g
 
-        this.calculateColorFunction = '' // for now
+        this.calculateColorFunction = calculateColorFunction
+        this.isInBoundsFunction = isInBoundsFunction
         
         this.uniforms = uniforms
     }
 
+    // bool isInBounds(vec3 p)
+    // {
+    //     //return p.y < Ut && p.y > 0.0 && p.x > 0.0 && p.z < 0.0 && length(p.xz) < 2.0;
+    //     return length(p.xz) < 10.0 && p.y > 0.0 && p.y < 10.0 && p.z > 0.0;
+    //     // return p.y < Ut && p.y > 0.0;
+    //     return true;
+    // }
+
+    DefaultIsInBounds(): string {
+        return `
+        bool isInBounds(vec3 p)
+        {
+            return true;
+        }
+        `
+    }
+
+    DefaultCalculateColor() :string {
+        return `
+        vec4 calculateColor(vec3 p, vec3 d, vec3 n)
+        {
+            return vec4(n, 1.0);
+        }`
+    }
+
     GenerateShaders(): Shaders {
         const vertex = ISRaytracingVertexShader
-        const fragment = ConstructRTFragmentShader(this.c, this.g, this.uniforms)
+        const fragment = ConstructRTFragmentShader(
+            this.c,
+            this.g,
+            this.uniforms,
+            this.isInBoundsFunction === undefined ? this.DefaultIsInBounds(): this.isInBoundsFunction,
+            this.calculateColorFunction === undefined ? this.DefaultCalculateColor(): this.calculateColorFunction
+            )
         return {vertex: vertex, fragment: fragment}
     }
 }
