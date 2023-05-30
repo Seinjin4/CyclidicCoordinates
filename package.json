@@ -5,8 +5,7 @@
   "scripts": {
     "build": "webpack --config ./src/client/webpack.prod.js",
     "dev": "webpack serve --config ./src/client/webpack.dev.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "NODE_OPTIONS=\"--max-old-space-size=4096\" node ./dist/server/server.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Sean Bradley",
   "license": "ISC",
@@ -24,6 +23,7 @@
     "webpack-merge": "^5.8.0"
   },
   "dependencies": {
+    "dat.gui": "^0.7.9",
     "express": "^4.18.2",
     "mathjs": "^11.7.0"
   }
