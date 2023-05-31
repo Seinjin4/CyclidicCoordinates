@@ -449,6 +449,7 @@ params.ChangetoCoordControls();
 
 var gui = new dat.GUI();
 var surf = gui.addFolder('Surfaces');
+surf.open()
 surf.add(params, 'eConeVisible').name('Ellipse Cone Enabled').onChange(val => eConeMesh.visible = val)
 surf.add(params, 'hConeVisible').name('Hyperbole Cone Enabled').onChange(val => hConeMesh.visible = val)
 surf.add(params, 'CyclideVisible').name('Cyclide Enabled').onChange(val => CyclideMesh.visible = val)
