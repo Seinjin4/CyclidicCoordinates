@@ -8,6 +8,7 @@ import { GLSLType, Uniform } from "./shaders/ShaderGenerator";
 import { DragControls, DragObject } from "./input/DragControls";
 import { calculateEllipsePoint, calculateEllipsePoints, calculateHyperbolePoint, calculateHyperbolePoints, maxT, minT } from "./CoordinateSystemFunctions";
 import { dpCurve } from "./SingularityCurves";
+import * as dat from "dat.gui";
 
 const scene = new THREE.Scene()
 scene.background = new THREE.Color().setRGB(0.7,0.7,0.7)
@@ -26,7 +27,7 @@ let b = 1.9;
 let c = Math.sqrt(a*a - b*b) 
 
 let t = 1/3;
-let phi = Math.PI / 180 * 90
+let phi = Math.PI / 180 * 45
 
 // const axesHelper = new THREE.AxesHelper( 1 )
 // scene.add( axesHelper )
@@ -75,16 +76,16 @@ phiControl.positionValidation = (position: THREE.Vector3) : THREE.Vector3 => {
 
 scene.add(aControl.sceneObject)
 scene.add(bControl.sceneObject)
-// scene.add(tControl.sceneObject)
-// scene.add(phiControl.sceneObject)
+scene.add(tControl.sceneObject)
+scene.add(phiControl.sceneObject)
 
 // const eConeEq = '4*Ub^2*Ut^2*Ua^2+(4*Ua^2*Ut^3*Ub-4*Ub*Ut*Ua^2)*y-4*Ut^2*Ua^2*z^2-4*Ub^2*Ut^2*x^2+(4*Ub*Ut^3*Usqrt+4*Ub*Ut*Usqrt)*x*y+(-4*Ua^2*Ut^2+2*Ub^2*Ut^2+Ub^2*Ut^4+Ub^2)2Ua*y^2'
 // const hConeEq = '-Ua^2*Ub^2*Usinphi^2+Ub^4*Usinphi^2+(2*Ua^2*Ub*Usinphi-2*Ub^3*Usinphi)*z+(-Usinphi^2*Ua^2+Ub^2*Usinphi^2)*y^2+Ub^2*Usinphi^2*x^2+(-Ua^2+Ua^2*Ucosphi^2+Ub^2)*z^2-2*Ub*Usinphi*Ua*Ucosphi*x*z'
 // const CyclideEq = '(x^2 + y^2 + z^2 + Ub^2 - Ur^2)^2 - 4*((Ua*x - Uc*Ur)^2 + Ub^2*y^2)'
 
-let eConeMesh: ImplicitSurfaceMesh;
-let hConeMesh: ImplicitSurfaceMesh;
-let CyclideMesh: ImplicitSurfaceMesh;
+let eCone: ImplicitSurfaceMesh;
+let hCone: ImplicitSurfaceMesh;
+let Cyclide: ImplicitSurfaceMesh;
 
 let sphereMesh: ImplicitSurfaceMesh;
 
@@ -186,7 +187,7 @@ vec4 calculateColor(vec3 p, vec3 d, vec3 n)
     }
     `
 
-    eConeMesh = new ImplicitSurfaceMesh(eConeCoeff, eConeGrad, uniforms, isInBounds, colorFunction)
+    eCone = new ImplicitSurfaceMesh(eConeCoeff, eConeGrad, uniforms, isInBounds, colorFunction)
     // const eConeMesh2 = new ImplicitSurfaceMesh(eConeCoeff, eConeGrad, uniforms, isInBounds, colorFunction)
     // eConeMesh2.setUniform('Ut', 1/3)
     // eConeMesh2.setUniform('UconeTop', calculateHyperbolePoint(a, b, c, 1/3).y)
@@ -198,12 +199,12 @@ vec4 calculateColor(vec3 p, vec3 d, vec3 n)
 }
 
 function UpdateECone(a:number, b:number, c:number) {
-    eConeMesh.setUniform('Ua', a)
-    eConeMesh.setUniform('Ub', b)
-    eConeMesh.setUniform('Uc', c)
-    eConeMesh.setUniform('Usqrt', Math.sqrt((a-b)*(a+b)))
-    eConeMesh.setUniform('Ut', t)
-    eConeMesh.setUniform('UconeTop', calculateHyperbolePoint(a, b, c, t).y)
+    eCone.setUniform('Ua', a)
+    eCone.setUniform('Ub', b)
+    eCone.setUniform('Uc', c)
+    eCone.setUniform('Usqrt', Math.sqrt((a-b)*(a+b)))
+    eCone.setUniform('Ut', t)
+    eCone.setUniform('UconeTop', calculateHyperbolePoint(a, b, c, t).y)
 }
 
 //hCone
@@ -251,7 +252,7 @@ function UpdateECone(a:number, b:number, c:number) {
         return p.z > 0.0 && dot(vec4(Uplane1, 0.0), vec4(p, 1.0)) > 0.0 && dot(Uplane2, vec4(p, 1.0)) > 0.0;
     }
     `
-    hConeMesh = new ImplicitSurfaceMesh(hConeCoeff, hConeGrad, uniforms, isInBounds, colorFunction)
+    hCone = new ImplicitSurfaceMesh(hConeCoeff, hConeGrad, uniforms, isInBounds, colorFunction)
     // {
     //     let hConeMesh2 = new ImplicitSurfaceMesh(hConeCoeff, hConeGrad, uniforms, isInBounds, colorFunction)
     //     hConeMesh2.setUniform('Usinphi', Math.sin(Math.PI / 180 * 45))
@@ -285,12 +286,12 @@ function UpdateHCone(a:number, b:number, c:number) {
     
     const plane2 = new THREE.Plane().setFromCoplanarPoints(pointOnEllipse, hyperboleHighPoint, hyperboleLowPoint)
 
-    hConeMesh.setUniform('Ua', a)
-    hConeMesh.setUniform('Ub', b)
-    hConeMesh.setUniform('Usinphi', Math.sin(phi))
-    hConeMesh.setUniform('Ucosphi', Math.cos(phi))
-    hConeMesh.setUniform('Uplane1', plane1Normal)
-    hConeMesh.setUniform('Uplane2', new THREE.Vector4(plane2.normal.x, plane2.normal.y, plane2.normal.z, plane2.constant))
+    hCone.setUniform('Ua', a)
+    hCone.setUniform('Ub', b)
+    hCone.setUniform('Usinphi', Math.sin(phi))
+    hCone.setUniform('Ucosphi', Math.cos(phi))
+    hCone.setUniform('Uplane1', plane1Normal)
+    hCone.setUniform('Uplane2', new THREE.Vector4(plane2.normal.x, plane2.normal.y, plane2.normal.z, plane2.constant))
 }
 
 //Cyclide
@@ -325,7 +326,7 @@ function UpdateHCone(a:number, b:number, c:number) {
     }
     `
 
-    CyclideMesh = new ImplicitSurfaceMesh(CyclideCoeff, CyclideGrad, uniforms, isInBounds, colorFunction)
+    Cyclide = new ImplicitSurfaceMesh(CyclideCoeff, CyclideGrad, uniforms, isInBounds, colorFunction)
     // let CyclideMesh2 = new ImplicitSurfaceMesh(CyclideCoeff, CyclideGrad, uniforms, isInBounds, colorFunction)
     // CyclideMesh2.setUniform('Ur', 0.5)
     // scene.add(CyclideMesh2.CreateMesh())
@@ -337,15 +338,17 @@ function UpdateHCone(a:number, b:number, c:number) {
 function OnAbcChange(a:number, b:number, c:number) {
     UpdateECone(a, b, c)
     UpdateHCone(a, b, c)
-    CyclideMesh.setUniform('Ua', a)
-    CyclideMesh.setUniform('Ub', b)
-    CyclideMesh.setUniform('Uc', c)
+    Cyclide.setUniform('Ua', a)
+    Cyclide.setUniform('Ub', b)
+    Cyclide.setUniform('Uc', c)
     htube.SetPoints(calculateHyperbolePoints(a, b, c))
     etube.SetPoints(calculateEllipsePoints(a, b, c))
     const singCurves = dpCurve(a, b, c, 200)
     c1.SetPoints(singCurves.xy)
     c2.SetPoints(singCurves.xz)
     c3.SetPoints(singCurves.yz)
+    tControl.sceneObject.position.copy(calculateHyperbolePoint(a, b, c, t))
+    phiControl.sceneObject.position.copy(calculateEllipsePoint(a, b, c, phi))
 }
 
 const etube = new TubeMesh(12, 1000, true)
@@ -387,21 +390,75 @@ bControl.addEventListener("positionchange", (event) => {
     OnAbcChange(a, b, c)
 })
 
-// scene.add(eConeMesh.CreateMesh())
-// scene.add(hConeMesh.CreateMesh())
-// scene.add(CyclideMesh.CreateMesh())
-// scene.add(sphereMesh.CreateMesh())
+tControl.addEventListener("positionchange", (event) => {
+    UpdateECone(a, b, c)
+})
 
-// scene.add(etube.CreateMesh())
-// scene.add(htube.CreateMesh())
-scene.add(c1.CreateMesh())
-scene.add(c2.CreateMesh())
-scene.add(c3.CreateMesh())
+phiControl.addEventListener("positionchange", (event) => {
+    UpdateHCone(a, b, c)
+})
+
+const eConeMesh = eCone.CreateMesh()
+const hConeMesh = hCone.CreateMesh()
+const CyclideMesh = Cyclide.CreateMesh()
+
+scene.add(eConeMesh)
+scene.add(hConeMesh)
+scene.add(CyclideMesh)
+
+scene.add(etube.CreateMesh())
+scene.add(htube.CreateMesh())
+// scene.add(c1.CreateMesh())
+// scene.add(c2.CreateMesh())
+// scene.add(c3.CreateMesh())
+
+let params = {
+    eConeVisible: true,
+    hConeVisible: true,
+    CyclideVisible: true,
+    Controls: 0,
+    ChangetoCoordControls: () => {
+        aControl.sceneObject.visible = true;
+        bControl.sceneObject.visible = true;
+        aControl.enabled = true;
+        bControl.enabled = true;
+        tControl.sceneObject.visible = false;
+        phiControl.sceneObject.visible = false;
+        tControl.enabled = false;
+        phiControl.enabled = false;
+    },
+    ChangetoSurfaceControls: () => {
+        aControl.sceneObject.visible = false;
+        bControl.sceneObject.visible = false;
+        aControl.enabled = false;
+        bControl.enabled = false;
+        tControl.sceneObject.visible = true;
+        phiControl.sceneObject.visible = true;
+        tControl.enabled = true;
+        phiControl.enabled = true;
+    },
+    ControlChange: (val: number) => {
+        if(val == 0)
+            params.ChangetoCoordControls()
+        if(val == 1)
+            params.ChangetoSurfaceControls()
+    }
+}
+
+params.ChangetoCoordControls();
+
+var gui = new dat.GUI();
+var surf = gui.addFolder('Surfaces');
+surf.add(params, 'eConeVisible').name('Ellipse Cone Enabled').onChange(val => eConeMesh.visible = val)
+surf.add(params, 'hConeVisible').name('Hyperbole Cone Enabled').onChange(val => hConeMesh.visible = val)
+surf.add(params, 'CyclideVisible').name('Cyclide Enabled').onChange(val => CyclideMesh.visible = val)
+
+gui.add(params, 'Controls', { Coordinate: 0, Surface: 1} ).onChange(val => params.ControlChange(val));
 
 export function OnWindowResize() {
-    eConeMesh.UpdateResolution()
-    hConeMesh.UpdateResolution()
-    CyclideMesh.UpdateResolution()
+    eCone.UpdateResolution()
+    hCone.UpdateResolution()
+    Cyclide.UpdateResolution()
 }
 
 export function UpdateScene() {

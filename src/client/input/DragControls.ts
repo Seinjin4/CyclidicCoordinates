@@ -25,6 +25,7 @@ let controlInstance: DragControls;
 class DragObject extends EventDispatcher {
     sceneObject: Mesh;
     draggingArea : Plane | Line3;
+    enabled: boolean
 
     positionValidation: (pos: THREE.Vector3) => THREE.Vector3
     onHoverOn: () => void
@@ -35,6 +36,7 @@ class DragObject extends EventDispatcher {
 
     constructor(draggingArea: Plane, position?: THREE.Vector3, sceneObject?: Mesh) {
         super()
+        this.enabled = true
         this.positionValidation = this.DefaultPositionValidation
         this.onHoverOn = this.DefaultHoverOn
         this.onHoverOff = this.DefaultHoverOff
@@ -134,7 +136,7 @@ function onPointerMove( event: PointerEvent ) {
 
         if ( controlInstance._intersections.length > 0 ) {
 
-            const object = controlInstance._objects.find(x => x.sceneObject.id == controlInstance._intersections[ 0 ].object.id);
+            const object = controlInstance._objects.find(x => x.sceneObject.id == controlInstance._intersections[ 0 ].object.id  && x.enabled);
             if(object === undefined)
                 return
 
@@ -196,7 +198,7 @@ function onPointerDown( event: MouseEvent ) {
 
     if ( controlInstance._intersections.length > 0 ) {
 
-        controlInstance._selected = controlInstance._objects.find(x => x.sceneObject.id == controlInstance._intersections[ 0 ].object.id);
+        controlInstance._selected = controlInstance._objects.find(x => x.sceneObject.id == controlInstance._intersections[ 0 ].object.id && x.enabled);
         if(controlInstance._selected === undefined)
             return
             
