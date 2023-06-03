@@ -1,4 +1,3 @@
-import { GetEqData } from "../math"
 import { PrepareUniforms, ShaderGenerator, Shaders, Uniform } from "./ShaderGenerator"
 
 export const ISRaytracingVertexShader: string = `

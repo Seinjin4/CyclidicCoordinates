@@ -112,9 +112,9 @@ export function dpCurve(a: number, b: number, c: number, n: number)
     let c1Ranges = xyIntersect(calcXRange(a, b, c), calcYRange(a, b, c));
     let c2Ranges = xyIntersect(calcXRange(c, a, b), calcYRange(c, a, b));
     let c3Ranges = xyIntersect(calcXRange(b, c, a), calcYRange(b, c, a));
-    console.log("c1Ranges:" + c1Ranges)
-    console.log("c2Ranges:" + c2Ranges)
-    console.log("c3Ranges:" + c3Ranges)
+    // console.log("c1Ranges:" + c1Ranges)
+    // console.log("c2Ranges:" + c2Ranges)
+    // console.log("c3Ranges:" + c3Ranges)
 
     c1Ranges.forEach(c1Range => {
         let c1q1: THREE.Vector3[] = [];
@@ -179,7 +179,6 @@ export function dpCurve(a: number, b: number, c: number, n: number)
             {
                 const c3x = x(t, c, a, b);
                 const c3y = y(t, c, a, b);
-
                 c3q1.push(new THREE.Vector3(0, c3x, c3y));
                 c3q2.push(new THREE.Vector3(0, -c3x, c3y));
                 c3q3.push(new THREE.Vector3(0, -c3x, -c3y));

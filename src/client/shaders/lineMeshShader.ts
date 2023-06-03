@@ -1,7 +1,7 @@
 import * as THREE from "three"
 import { GLSLType, PrepareUniforms, ShaderGenerator, Shaders, Uniform } from "./ShaderGenerator"
 
-export const lineMeshPointArraySize: number = 1024
+export const lineMeshPointArraySize: number = 512
 
 export class LineMeshShaderGenerator implements ShaderGenerator {
     calculateColorFunction: string

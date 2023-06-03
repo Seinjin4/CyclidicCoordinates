@@ -1,8 +1,6 @@
 import * as THREE from "three";
 import * as CCS from "./CyclidicCoordinateSystemScene";
-import * as CCS2 from "./CyclidicCoordinateSystemScene2";
-import * as DTS from "./DragControlTest"
-import * as TS from "./TestScene"
+import * as SCS from "./SingularityCurvesScene";
 
 const renderer = new THREE.WebGLRenderer()
 console.log('Max funiforms: ' + renderer.capabilities.maxFragmentUniforms)
@@ -10,8 +8,8 @@ console.log('Max vuniforms: ' + renderer.capabilities.maxVertexUniforms)
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
 
-let scene = CCS2.CreateScene(renderer)
-let camera = CCS2.GetCamera()
+let scene = CCS.CreateScene(renderer)
+let camera = CCS.GetCamera()
 
 function render() {
     renderer.render(scene, camera)
@@ -22,14 +20,14 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight)
-    CCS2.OnWindowResize()
+    CCS.OnWindowResize()
     render()
 }
 
 function animate() {
     requestAnimationFrame(animate)
 
-    CCS2.UpdateScene()
+    CCS.UpdateScene()
 
     render()
 }
